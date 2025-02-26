@@ -16,22 +16,19 @@ extension UIImage {
         }
 
         var transform: CGAffineTransform = CGAffineTransform.identity
-        
+
         switch imageOrientation {
         case .down, .downMirrored:
             transform = transform.translatedBy(x: size.width, y: size.height)
             transform = transform.rotated(by: CGFloat.pi)
-            print("down")
             break
         case .left, .leftMirrored:
             transform = transform.translatedBy(x: size.width, y: 0)
             transform = transform.rotated(by: CGFloat.pi / 2.0)
-            print("left")
             break
         case .right, .rightMirrored:
             transform = transform.translatedBy(x: 0, y: size.height)
             transform = transform.rotated(by: CGFloat.pi / -2.0)
-            print("right")
             break
         case .up, .upMirrored:
             break
@@ -48,9 +45,9 @@ extension UIImage {
             ctx.draw(self.cgImage!, in: CGRect(x: 0, y: 0, width: size.width, height: size.height))
             break
         }
-        
+
         guard let newCGImage = ctx.makeImage() else { return nil }
-        
+
         return UIImage.init(cgImage: newCGImage, scale: 1, orientation: .up)
     }
 }
