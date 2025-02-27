@@ -54,73 +54,83 @@ class CameraController: NSObject {
     /** Video zoom factor that is used for manually zooming in and out via pinch gesture */
     var videoZoomFactor: CGFloat = 1
 
-    public func prepare(cameraPosition: CameraPosition?, enableHighResolution isHighResolutionPhotoEnabled: Bool, completionHandler: @escaping (Error?) -> Void) {
-        // Set up capture session
-        let captureSession = AVCaptureSession()
-        self.captureSession = captureSession
+    /*
+     Warm up the camera by pre-configuring cameras in the background.
+     */
+    public func warmUp() {
+        AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+            guard let self = self, granted else { return }
 
-        // Use medium quality initially for faster startup, then upgrade if needed
-        captureSession.sessionPreset = .medium
-
-        // Set up preview layer immediately
-        previewLayer.session = captureSession
-        previewLayer.videoGravity = AVLayerVideoGravity.resizeAspectFill
-
-        // Initialize front and back camera
-        do {
-            try initializeCameraDevices(forPosition: cameraPosition ?? .rear)
-            try initializeCameraInput()
-        } catch {
-            completionHandler(error)
-            return
-        }
-
-        // Start the session immediately to show the preview faster
-        DispatchQueue.global(qos: .userInitiated).async {
-            captureSession.startRunning()
-
-            // Apply basic camera settings on background thread
-            do {
-                try self.configureCameraSettings()
-            } catch {
-                DispatchQueue.main.async {
-                    completionHandler(error)
+            DispatchQueue.global(qos: .userInitiated).async {
+                // Create and configure capture session if needed
+                if self.captureSession == nil {
+                    self.captureSession = AVCaptureSession()
+                    self.captureSession?.sessionPreset = .photo
                 }
-                return
-            }
 
-            // Configure photo output and session preset in background
-            captureSession.beginConfiguration()
+                guard let session = self.captureSession else { return }
 
-            // Upgrade session preset if needed
-            if (isHighResolutionPhotoEnabled) {
-                captureSession.sessionPreset = .photo
-            }
+                // Configure preview layer on main thread
+                DispatchQueue.main.async {
+                    self.previewLayer.session = session
+                    self.previewLayer.videoGravity = .resizeAspectFill
+                }
 
-            // Configure camera output
-            self.photoOutput.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])], completionHandler: nil)
-            self.photoOutput.isHighResolutionCaptureEnabled = isHighResolutionPhotoEnabled
-            if captureSession.canAddOutput(self.photoOutput) {
-                captureSession.addOutput(self.photoOutput)
-            }
+                // Discover cameras
+                let _ = self.discoverCameraDevices()
 
-            captureSession.commitConfiguration()
+                // Setup input for the first available camera
+                do {
+                    guard let device = self.rearCamera ?? self.frontCamera else { return }
+                    self.currentCamera = device
+                    let input = try AVCaptureDeviceInput(device: device)
+                    if session.canAddInput(input) {
+                        session.addInput(input)
+                    }
+                    self.cameraInput = input
+                } catch {
+                    // Silent failure is acceptable during warm up
+                }
 
-            // Call completion handler on main thread
-            DispatchQueue.main.async {
-                completionHandler(nil)
+                // Pre configure photo output
+                self.configurePhotoOutput(true)
             }
         }
     }
 
-    public func stop() {
-        // Perform cleanup on background thread to avoid UI blocking
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession?.stopRunning()
+    public func prepare(cameraPosition: CameraPosition?, enableHighResolution isHighResolutionPhotoEnabled: Bool, completionHandler: @escaping (Error?) -> Void) {
+        // Set up capture session
+        let captureSession: AVCaptureSession
+        if let existingSession = self.captureSession {
+            captureSession = existingSession
+        } else {
+            captureSession = AVCaptureSession()
+            self.captureSession = captureSession
+            captureSession.sessionPreset = .photo
+        }
 
-            // Clear references for better memory management
-            DispatchQueue.main.async { [weak self] in
-                self?.previewLayer.session = nil
+        // Start session immediately, configure in background
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            // Initialize devices and input sequentially
+            do {
+                // try self.initializeCameraDevices(forPosition: cameraPosition ?? .rear)
+                // try self.initializeCameraInput()
+
+                // Start session before additional configuration
+                captureSession.startRunning()
+                let currentCamera = self.currentCamera!
+                configureDeviceSettings(for: currentCamera)
+
+                // Notify UI that camera is running (can show preview)
+                DispatchQueue.main.async {
+                    completionHandler(nil)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completionHandler(error)
+                }
             }
         }
     }
@@ -136,112 +146,22 @@ class CameraController: NSObject {
      - Throws: `CameraControllerError.noCamerasAvailable` if no suitable camera is available.
      */
     private func initializeCameraDevices(forPosition cameraPosition: CameraPosition) throws {
-        // Only initialize devices if they haven't been warmed up already
-        if self.rearCamera == nil {
-            if let rearCamera = AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: .back) {
-                self.rearCamera = rearCamera
-            } else {
-                self.rearCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
-            }
+        // If devices are already discovered, just set the current camera and return
+        if self.rearCamera != nil && self.frontCamera != nil {
+            self.currentCamera = cameraPosition == .rear ? rearCamera : frontCamera
+            return
         }
 
-        if self.frontCamera == nil {
-            self.frontCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
-        }
-
-        guard cameraPosition == .rear && rearCamera != nil || cameraPosition == .front && frontCamera != nil else {
+        // Discover camera devices
+        if !self.discoverCameraDevices() {
             throw CameraControllerError.noCamerasAvailable
         }
 
+        // Set current camera
         self.currentCamera = cameraPosition == .rear ? rearCamera : frontCamera
-    }
 
-    /**
-     Configure several camera related properties based on the currently selected camera device.
-     This function also keeps care of the default zoom factor for the chosen camera device
-     */
-    private func configureCameraSettings() throws {
-        guard let cameraDevice = self.currentCamera else {
+        guard self.currentCamera != nil else {
             throw CameraControllerError.noCamerasAvailable
-        }
-
-        // Only lock and configure if needed
-        try cameraDevice.lockForConfiguration()
-        defer { cameraDevice.unlockForConfiguration() }
-
-        // Apply settings only if they aren't already set
-        if cameraDevice.focusMode != .continuousAutoFocus && cameraDevice.isFocusModeSupported(.continuousAutoFocus) {
-            cameraDevice.focusMode = .continuousAutoFocus
-        }
-
-        if cameraDevice.exposureMode != .continuousAutoExposure && cameraDevice.isExposureModeSupported(.continuousAutoExposure) {
-            cameraDevice.exposureMode = .continuousAutoExposure
-        }
-
-        // Always ensure proper zoom for triple camera since position might have changed
-        if cameraDevice.deviceType == .builtInTripleCamera && cameraDevice.videoZoomFactor != 2.0 {
-            cameraDevice.videoZoomFactor = 2.0
-        }
-    }
-
-    public func warmUpCamera() {
-        // Pre-warm AVCaptureSession for faster startup when actually needed
-        AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-            guard let self = self, granted else { return }
-
-            // Initialize camera devices in background with the same configuration as would be used later
-            DispatchQueue.global(qos: .userInitiated).async {
-                // Pre-initialize rear camera with triple camera if available
-                if self.rearCamera == nil {
-                    if let rearCamera = AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: .back) {
-                        self.rearCamera = rearCamera
-                    } else {
-                        self.rearCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
-                    }
-
-                    // Pre-configure rear camera if available
-                    if let device = self.rearCamera {
-                        do {
-                            try device.lockForConfiguration()
-
-                            // Set focus and exposure modes
-                            if device.isFocusModeSupported(.continuousAutoFocus) {
-                                device.focusMode = .continuousAutoFocus
-                            }
-
-                            if device.isExposureModeSupported(.continuousAutoExposure) {
-                                device.exposureMode = .continuousAutoExposure
-                            }
-
-                            // Set appropriate zoom factor for triple camera
-                            if device.deviceType == .builtInTripleCamera {
-                                device.videoZoomFactor = 2.0
-                            }
-
-                            device.unlockForConfiguration()
-                        } catch {
-                            // Silent failure during warm-up is acceptable
-                        }
-                    }
-                }
-
-                // Pre-initialize front camera
-                if self.frontCamera == nil {
-                    self.frontCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
-
-                    // Pre-configure front camera
-                    if let device = self.frontCamera {
-                        try? device.lockForConfiguration()
-                        if device.isFocusModeSupported(.continuousAutoFocus) {
-                            device.focusMode = .continuousAutoFocus
-                        }
-                        if device.isExposureModeSupported(.continuousAutoExposure) {
-                            device.exposureMode = .continuousAutoExposure
-                        }
-                        device.unlockForConfiguration()
-                    }
-                }
-            }
         }
     }
 
@@ -264,16 +184,93 @@ class CameraController: NSObject {
         }
     }
 
+    /**
+     Configure photo output settings
+     */
+    private func configurePhotoOutput(_ isHighResolutionPhotoEnabled: Bool) {
+        guard let captureSession = captureSession else { return }
+        if captureSession.outputs.contains(self.photoOutput) { return }
+
+        self.photoOutput.setPreparedPhotoSettingsArray(
+            [AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])],
+            completionHandler: nil
+        )
+        self.photoOutput.isHighResolutionCaptureEnabled = isHighResolutionPhotoEnabled
+
+        captureSession.beginConfiguration()
+        if captureSession.canAddOutput(self.photoOutput) {
+            captureSession.addOutput(self.photoOutput)
+        }
+        captureSession.commitConfiguration()
+    }
+
+    /**
+     Configure camera device settings for focus, exposure, and zoom.
+     */
+    private func configureDeviceSettings(for device: AVCaptureDevice) {
+        do {
+            try device.lockForConfiguration()
+
+            // Set appropriate zoom factor for triple camera
+            if device.deviceType == .builtInTripleCamera {
+                device.videoZoomFactor = 2.0
+            }
+
+            // Set focus mode
+            if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+
+            // Set exposure mode
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+
+            device.unlockForConfiguration()
+        } catch {
+            // Silent failure is acceptable during setup
+        }
+    }
+
+    /*
+     Stop the camera session and release resources.
+     */
+    public func stop() {
+       self?.captureSession?.stopRunning()
+    }
+
+    /**
+     Discovers and initializes camera devices.
+     Returns true if devices were successfully discovered.
+     */
+    private func discoverCameraDevices() -> Bool {
+        // Only create discovery session if needed
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInTripleCamera, .builtInWideAngleCamera],
+            mediaType: .video,
+            position: .unspecified
+        )
+
+        // Get all devices at once
+        let devices = discoverySession.devices
+
+        // Find front and back cameras
+        self.rearCamera = devices.first(where: { $0.position == .back })
+        self.frontCamera = devices.first(where: { $0.position == .front })
+
+        return self.rearCamera != nil || self.frontCamera != nil
+    }
+
     public func displayPreview(on view: UIView) {
-        // Optimize layer insertion by using main thread and CATransaction
         DispatchQueue.main.async {
             CATransaction.begin()
-            CATransaction.setDisableActions(true) // Avoid implicit animations
+            CATransaction.setDisableActions(true)
 
+            self.previewLayer.frame = view.bounds
             view.layer.insertSublayer(self.previewLayer, at: 0)
-            self.previewLayer.frame = view.frame
 
             CATransaction.commit()
+
             self.updateVideoOrientation()
         }
     }
@@ -344,9 +341,6 @@ class CameraController: NSObject {
 
         // Reconfigure camera settings
         captureSession.commitConfiguration()
-
-        // Apply settings after configuration is committed
-        try? self.configureCameraSettings()
     }
 
     func captureImage(completion: @escaping (UIImage?, Error?) -> Void) {
@@ -468,6 +462,34 @@ class CameraController: NSObject {
         pinchGesture.delegate = delegate
         target.addGestureRecognizer(pinchGesture)
     }
+
+    private func updateFocusAndExposure(for device: AVCaptureDevice, at point: CGPoint) {
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+
+            let focusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus
+            if device.isFocusPointOfInterestSupported && device.isFocusModeSupported(focusMode) {
+                device.focusPointOfInterest = point
+                device.focusMode = focusMode
+            }
+
+            let exposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure
+            if device.isExposurePointOfInterestSupported && device.isExposureModeSupported(exposureMode) {
+                device.exposurePointOfInterest = point
+                device.exposureMode = exposureMode
+            }
+        } catch {
+            debugPrint(error)
+        }
+    }
+
+    @objc func handleTap(_ tap: UITapGestureRecognizer) {
+        guard let device = self.currentCamera, let view = tap.view else { return }
+        let tapPoint = tap.location(in: view)
+        let devicePoint = self.previewLayer.captureDevicePointConverted(fromLayerPoint: tapPoint)
+        updateFocusAndExposure(for: device, at: devicePoint)
+    }
 }
 
 extension CameraController: AVCapturePhotoCaptureDelegate {
@@ -489,32 +511,6 @@ extension CameraController: AVCapturePhotoCaptureDelegate {
 extension CameraController: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return true
-    }
-
-    @objc func handleTap(_ tap: UITapGestureRecognizer) {
-        guard let device = self.currentCamera else { return }
-
-        let point = tap.location(in: tap.view)
-        let devicePoint = self.previewLayer.captureDevicePointConverted(fromLayerPoint: point)
-
-        do {
-            try device.lockForConfiguration()
-            defer { device.unlockForConfiguration() }
-
-            let focusMode = AVCaptureDevice.FocusMode.continuousAutoFocus
-            if device.isFocusPointOfInterestSupported && device.isFocusModeSupported(focusMode) {
-                device.focusPointOfInterest = CGPoint(x: CGFloat(devicePoint.x), y: CGFloat(devicePoint.y))
-                device.focusMode = focusMode
-            }
-
-            let exposureMode = AVCaptureDevice.ExposureMode.continuousAutoExposure
-            if device.isExposurePointOfInterestSupported && device.isExposureModeSupported(exposureMode) {
-                device.exposurePointOfInterest = CGPoint(x: CGFloat(devicePoint.x), y: CGFloat(devicePoint.y))
-                device.exposureMode = exposureMode
-            }
-        } catch {
-            debugPrint(error)
-        }
     }
 
     @objc private func handlePinch(_ pinch: UIPinchGestureRecognizer) {

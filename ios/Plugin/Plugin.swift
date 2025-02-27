@@ -26,7 +26,7 @@ public class CameraPreview: CAPPlugin {
      Pre-warm camera when plugin is loaded
      */
     public override func load() {
-        cameraController.warmUpCamera()
+        cameraController.warmUp()
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(appDidBecomeActive(_:)),
                                                name: UIApplication.didBecomeActiveNotification,
@@ -322,7 +322,7 @@ public class CameraPreview: CAPPlugin {
     }
     
     @objc func appDidBecomeActive(_ notification: Notification) {
-        cameraController.warmUpCamera()
+        cameraController.warmUp()
     }
     
     /**
