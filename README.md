@@ -3,7 +3,7 @@
 <h3 align="center">Capacitor Camera Preview Lite</h3>
 <p align="center"><strong><code>@michaelwolz/camera-preview-lite</code></strong></p>
 <br>
-<p align="center"><strong>CAPACITOR 6</strong></p><br>
+<p align="center"><strong>CAPACITOR 7</strong></p><br>
 
 <p align="center">
   Capacitor plugin that allows camera interaction from Javascript and HTML<br>(based on <a href="https://github.com/capacitor-community/camera-preview" target="_blank">@capacitor-community/camera-preview</a> which itself was based on cordova-plugin-camera-preview).
@@ -12,6 +12,8 @@
 </p>
 
 <br>
+
+Version 7 of this plugin requires Capacitor 7.
 
 Version 6 of this plugin requires Capacitor 6.
 

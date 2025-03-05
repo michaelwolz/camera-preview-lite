@@ -16,13 +16,6 @@ export class CameraPreviewWeb extends WebPlugin implements CameraPreviewPlugin {
    */
   private isBackCamera: boolean;
 
-  constructor() {
-    super({
-      name: 'CameraPreview',
-      platforms: ['web'],
-    });
-  }
-
   async start(options: CameraPreviewOptions): Promise<{}> {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
 
