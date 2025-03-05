@@ -65,7 +65,7 @@ public class CameraPreview extends Plugin implements CameraActivity.CameraPrevie
     @PluginMethod
     public void setOpacity(PluginCall call) {
         if (this.hasCamera(call) == false) {
-            call.error("Camera is not running");
+            call.reject("Camera is not running");
             return;
         }
 
