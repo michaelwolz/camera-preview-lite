@@ -37,18 +37,18 @@ extension CameraControllerError: LocalizedError {
 
 class CameraController: NSObject {
     var captureSession: AVCaptureSession?
-    
+
     var photoOutput = AVCapturePhotoOutput()
     var photoCaptureCompletionBlock: ((UIImage?, Error?) -> Void)?
     var sampleBufferCaptureCompletionBlock: ((UIImage?, Error?) -> Void)?
-    
+
     var previewLayer = AVCaptureVideoPreviewLayer()
-    
+
     var frontCamera: AVCaptureDevice?
     var rearCamera: AVCaptureDevice?
     var currentCamera: AVCaptureDevice?
     var cameraInput: AVCaptureDeviceInput?
-    
+
     var flashMode = AVCaptureDevice.FlashMode.off
 
     /** Video zoom factor that is used for manually zooming in and out via pinch gesture */
@@ -56,17 +56,17 @@ class CameraController: NSObject {
 
     public func prepare(cameraPosition: CameraPosition?, enableHighResolution isHighResolutionPhotoEnabled: Bool, completionHandler: @escaping (Error?) -> Void) {
         // Set up capture session
-        let captureSession = AVCaptureSession()        
+        let captureSession = AVCaptureSession()
         self.captureSession = captureSession
-        
+
         if (isHighResolutionPhotoEnabled) {
             captureSession.sessionPreset = .photo
         }
-        
+
         // Set up preview layer
         previewLayer.session = captureSession
         previewLayer.videoGravity = AVLayerVideoGravity.resizeAspectFill
-                
+
         // Initialize front and back camera
         do {
             try initializeCameraDevices(forPosition: cameraPosition ?? .rear)
@@ -75,7 +75,7 @@ class CameraController: NSObject {
             completionHandler(error)
             return
         }
-        
+
         // Adding the camera output might take quite some time so it's outsourced into a different queue
         // Configure camera output
         self.photoOutput.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])], completionHandler: nil)
@@ -83,9 +83,9 @@ class CameraController: NSObject {
         if captureSession.canAddOutput(self.photoOutput) {
             captureSession.addOutput(self.photoOutput)
         }
-        
+
         captureSession.startRunning()
-        
+
         // Lastly setting the video zoom factor
         do {
             try self.configureCameraSettings()
@@ -94,17 +94,17 @@ class CameraController: NSObject {
             completionHandler(error)
         }
     }
-    
+
     public func stop() {
         self.captureSession?.stopRunning()
     }
-    
+
     /**
      Initializes the available camera devices by selecting the best fit for the current iOS device.
-     
+
      This method sets the current camera device to the requested one and also initializes the opposite camera for easy switching later.
      It configures virtual devices supporting ultra-wide angle and better autofocus to address several focus issues observed with newer iPhones.
-     
+
      - Parameters:
      - cameraPosition: The position of the camera to initialize (front or rear).
      - Throws: `CameraControllerError.noCamerasAvailable` if no suitable camera is available.
@@ -115,18 +115,18 @@ class CameraController: NSObject {
         } else {
             self.rearCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
         }
-        
+
         if let frontCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
             self.frontCamera = frontCamera
         }
-        
+
         guard cameraPosition == .rear && rearCamera != nil || cameraPosition == .front && frontCamera != nil else {
             throw CameraControllerError.noCamerasAvailable
         }
-        
+
         self.currentCamera = cameraPosition == .rear ? rearCamera : frontCamera
     }
-    
+
     /**
      Configure several camera related properties based on the currently selected camera device.
      This function also keeps care of the default zoom factor for the chosen camera device
@@ -138,15 +138,15 @@ class CameraController: NSObject {
 
         try cameraDevice.lockForConfiguration()
         defer { cameraDevice.unlockForConfiguration() }
-        
+
         if (cameraDevice.isFocusModeSupported(.continuousAutoFocus)) {
             cameraDevice.focusMode = .continuousAutoFocus
         }
-        
+
         if (cameraDevice.isExposureModeSupported(.continuousAutoExposure)) {
             cameraDevice.exposureMode = .continuousAutoExposure
         }
-        
+
         if (cameraDevice.deviceType == .builtInTripleCamera) {
             // Note that zoomFactor 2 "equals" the regular 1x zoom factor of the native iphone camera app
             // 0.5x however equal a videoZoomFactor of 1. We do not want to use ultra wide angle by default
@@ -154,15 +154,15 @@ class CameraController: NSObject {
             cameraDevice.videoZoomFactor = 2.0
         }
     }
-    
+
     /**
      Initialize the camera inputs
      */
     private func initializeCameraInput() throws {
         guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
-        
+
         guard let camera = self.currentCamera else { throw CameraControllerError.noCamerasAvailable }
-        
+
         do {
             let cameraInput = try AVCaptureDeviceInput(device: camera)
             if captureSession.canAddInput(cameraInput) {
@@ -173,13 +173,13 @@ class CameraController: NSObject {
             throw CameraControllerError.noCamerasAvailable
         }
     }
-    
+
     public func displayPreview(on view: UIView) {
         view.layer.insertSublayer(self.previewLayer, at: 0)
         previewLayer.frame = view.frame
         updateVideoOrientation()
     }
-    
+
     public func updateVideoOrientation() {
         assert(Thread.isMainThread)
 
@@ -211,7 +211,7 @@ class CameraController: NSObject {
 
     public func switchCameras() throws {
         guard let captureSession = self.captureSession, captureSession.isRunning else { throw CameraControllerError.captureSessionIsMissing }
-        
+
         guard let device = self.currentCamera else { throw CameraControllerError.noCamerasAvailable }
 
         captureSession.beginConfiguration()
@@ -221,7 +221,7 @@ class CameraController: NSObject {
                   let frontCamera = self.frontCamera else { throw CameraControllerError.invalidOperation }
 
             captureSession.removeInput(cameraInput)
-            
+
             let newCameraInput = try AVCaptureDeviceInput(device: frontCamera)
 
             if captureSession.canAddInput(newCameraInput) {
@@ -236,9 +236,9 @@ class CameraController: NSObject {
         func switchToRearCamera() throws {
             guard let cameraInput = self.cameraInput, captureSession.inputs.contains(cameraInput),
                   let rearCamera = self.rearCamera else { throw CameraControllerError.invalidOperation }
-            
+
             captureSession.removeInput(cameraInput)
-            
+
             let newCameraInput = try AVCaptureDeviceInput(device: rearCamera)
 
             if captureSession.canAddInput(newCameraInput) {
@@ -260,7 +260,7 @@ class CameraController: NSObject {
         @unknown default:
             return
         }
-        
+
         // Reconfigure camera settings
         try? self.configureCameraSettings()
 
@@ -272,7 +272,7 @@ class CameraController: NSObject {
             completion(nil, CameraControllerError.captureSessionIsMissing);
             return
         }
-        
+
         let settings = AVCapturePhotoSettings()
         settings.flashMode = self.flashMode
 
@@ -296,7 +296,7 @@ class CameraController: NSObject {
         if device.hasFlash {
             for flashMode in self.photoOutput.supportedFlashModes {
                 var flashModeValue: String?
-                
+
                 switch flashMode {
                 case AVCaptureDevice.FlashMode.off:
                     flashModeValue = "off"
@@ -306,40 +306,40 @@ class CameraController: NSObject {
                     flashModeValue = "auto"
                 default: break
                 }
-                
+
                 if flashModeValue != nil {
                     supportedFlashModesAsStrings.append(flashModeValue!)
                 }
             }
         }
-        
+
         if device.hasTorch {
             supportedFlashModesAsStrings.append("torch")
         }
-        
+
         return supportedFlashModesAsStrings
     }
 
     func setFlashMode(flashMode: AVCaptureDevice.FlashMode) throws {
         guard let device = self.currentCamera else { throw CameraControllerError.noCamerasAvailable }
-        
+
         if !self.photoOutput.supportedFlashModes.contains(flashMode) {
             return
         }
-        
+
         do {
             try device.lockForConfiguration()
-            
+
             if device.hasTorch && device.isTorchAvailable && device.torchMode == AVCaptureDevice.TorchMode.on {
                 device.torchMode = AVCaptureDevice.TorchMode.off
             }
-            
+
             let photoSettings = AVCapturePhotoSettings()
             photoSettings.flashMode = flashMode
-            
+
             self.flashMode = flashMode
             self.photoOutput.photoSettingsForSceneMonitoring = photoSettings
-            
+
             device.unlockForConfiguration()
         } catch {
             throw CameraControllerError.invalidOperation
@@ -353,7 +353,7 @@ class CameraController: NSObject {
 
         do {
             try device.lockForConfiguration()
-            
+
             if device.isTorchModeSupported(AVCaptureDevice.TorchMode.on) {
                 device.torchMode = AVCaptureDevice.TorchMode.on
             } else if device.isTorchModeSupported(AVCaptureDevice.TorchMode.auto) {
@@ -361,13 +361,13 @@ class CameraController: NSObject {
             } else {
                 device.torchMode = AVCaptureDevice.TorchMode.off
             }
-            
+
             device.unlockForConfiguration()
         } catch {
             throw CameraControllerError.invalidOperation
         }
     }
-    
+
     public func setupGestures(target: UIView, enableZoom: Bool) {
         setupTapGesture(target: target, selector: #selector(handleTap(_:)), delegate: self)
         if enableZoom {
@@ -386,7 +386,7 @@ class CameraController: NSObject {
         pinchGesture.delegate = delegate
         target.addGestureRecognizer(pinchGesture)
     }
-    
+
 }
 
 extension CameraController: AVCapturePhotoCaptureDelegate {
@@ -395,12 +395,12 @@ extension CameraController: AVCapturePhotoCaptureDelegate {
             self.photoCaptureCompletionBlock?(nil, error)
             return
         }
-        
+
         guard let data = photo.fileDataRepresentation(), let image = UIImage(data: data) else {
             self.photoCaptureCompletionBlock?(nil, CameraControllerError.unknown)
             return
         }
-        
+
         self.photoCaptureCompletionBlock?(image.fixedOrientation(), nil)
     }
 }

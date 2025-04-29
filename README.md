@@ -31,17 +31,21 @@ npm install @michaelwolz/camera-preview-lite
 ```
 
 Then run
+
 ```
 npx cap sync
 ```
 
 ## Extra Android installation steps
+
 **Important** `camera-preview` 3+ requires Gradle 7. If you are using Gradle 4, please use [version 2](https://github.com/capacitor-community/camera-preview/tree/v2.1.0) of this plugin.
 
 Open `android/app/src/main/AndroidManifest.xml` and above the closing `</manifest>` tag add this line to request the CAMERA permission:
+
 ```xml
 <uses-permission android:name="android.permission.CAMERA" />
 ```
+
 For more help consult the [Capacitor docs](https://capacitorjs.com/docs/android/configuration#configuring-androidmanifestxml).
 
 ### Variables
@@ -62,12 +66,12 @@ then in html add `<div id="cameraPreview"></div>`
 
 and `CameraPreview.start({ parent: "cameraPreview"});` will work.
 
-
 # Methods
 
 ### start(options)
 
 Starts the camera preview instance.
+
 <br>
 
 | Option                       | values       | descriptions                                                                                                                                                  |
@@ -130,20 +134,19 @@ Ex: VueJS >> App.vue component
 <style>
 ```
 
-
 ### stop()
 
-<info>Stops the camera preview instance.</info><br/>
+<info>Stops the camera preview instance.</info>
+<br />
 
 ```javascript
 CameraPreview.stop();
 ```
 
 ### flip()
+
 <info>Switch between rear and front camera only for android and ios, web is not supported</info>
-```javascript
-CameraPreview.flip()
-```
+```javascript CameraPreview.flip() ```
 
 ### capture(options)
 
@@ -168,11 +171,16 @@ const base64PictureData = result.value;
 
 ### captureSample(options)
 
-| Option   | values        | descriptions                                                         |
-|----------|---------------|----------------------------------------------------------------------|
-| quality  | number        | (optional) The picture quality, 0 - 100, default 85                  |
+| Option  | values | descriptions                                        |
+| ------- | ------ | --------------------------------------------------- |
+| quality | number | (optional) The picture quality, 0 - 100, default 85 |
 
-<info>Captures a sample image from the video stream. Only for Android and iOS, web implementation falls back to `capture` method. This can be used to perform real-time analysis on the current frame in the video. The argument `quality` defaults to `85` and specifies the quality/compression value: `0=max compression`, `100=max quality`.</info><br/>
+<info>
+  Captures a sample image from the video stream. Only for Android and iOS, web implementation falls back to `capture`
+  method. This can be used to perform real-time analysis on the current frame in the video. The argument `quality`
+  defaults to `85` and specifies the quality/compression value: `0=max compression`, `100=max quality`.
+</info>
+<br />
 
 ```javascript
 import { CameraSampleOptions } from '@capacitor-community/camera-preview';
@@ -187,7 +195,11 @@ const base64PictureData = result.value;
 
 ### getSupportedFlashModes()
 
-<info>Get the flash modes supported by the camera device currently started. Returns an array containing supported flash modes. See <code>[FLASH_MODE](#camera_Settings.FlashMode)</code> for possible values that can be returned</info><br/>
+<info>
+  Get the flash modes supported by the camera device currently started. Returns an array containing supported flash
+  modes. See <code>[FLASH_MODE](#camera_Settings.FlashMode)</code> for possible values that can be returned
+</info>
+<br />
 
 ```javascript
 import { CameraPreviewFlashMode } from '@capacitor-community/camera-preview';
@@ -195,9 +207,14 @@ import { CameraPreviewFlashMode } from '@capacitor-community/camera-preview';
 const flashModes = await CameraPreview.getSupportedFlashModes();
 const supportedFlashModes: CameraPreviewFlashMode[] = flashModes.result;
 ```
+
 ### setFlashMode(options)
 
-<info>Set the flash mode. See <code>[FLASH_MODE](#camera_Settings.FlashMode)</code> for details about the possible values for flashMode.</info><br/>
+<info>
+  Set the flash mode. See <code>[FLASH_MODE](#camera_Settings.FlashMode)</code> for details about the possible values
+  for flashMode.
+</info>
+<br />
 
 ```javascript
 const CameraPreviewFlashMode: CameraPreviewFlashMode = 'torch';
@@ -207,11 +224,21 @@ CameraPreview.setFlashMode(cameraPreviewFlashMode);
 
 ### setOpacity(options: CameraOpacityOptions): Promise<{}>;  ---- ANDROID only
 
-<info>Set the opacity for the camera preview</info><br/>
+<info>Set the opacity for the camera preview</info>
+<br />
 
 ```javascript
-const myCamera = CameraPreview.start({enableOpacity: true});
-myCamera.setOpacity({opacity: 0.4});
+const myCamera = CameraPreview.start({ enableOpacity: true });
+myCamera.setOpacity({ opacity: 0.4 });
+```
+
+### isCameraStarted() ---- ANDROID and iOS only
+
+<info>Check or detect if the camera has been started</info>
+<br />
+
+```javascript
+const { value } = await CameraPreview.isCameraStarted();
 ```
 
 # Settings
@@ -220,7 +247,8 @@ myCamera.setOpacity({opacity: 0.4});
 
 ### FLASH_MODE
 
-<info>Flash mode settings:</info><br/>
+<info>Flash mode settings:</info>
+<br />
 
 | Name    | Type    | Default | Note          |
 | ------- | ------- | ------- | ------------- |
