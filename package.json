@@ -1,6 +1,6 @@
 {
   "name": "@michaelwolz/camera-preview-lite",
-  "version": "7.0.2",
+  "version": "7.1.0",
   "description": "Fork of the capacitor-community/camera-preview plugin focusing on high resolution photos without bloating up the code.",
   "type": "module",
   "main": "dist/plugin.cjs.js",
