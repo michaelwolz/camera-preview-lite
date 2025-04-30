@@ -2,8 +2,8 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
-include ':capacitor-community-camera-preview'
-project(':capacitor-community-camera-preview').projectDir = new File('../../android')
+include ':michaelwolz-camera-preview-lite'
+project(':michaelwolz-camera-preview-lite').projectDir = new File('../../android')
 
 include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/android')

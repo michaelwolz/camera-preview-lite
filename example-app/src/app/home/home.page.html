@@ -27,15 +27,14 @@
         Camera Preview</ion-button>
       <ion-button expand="block" color="tertiary" class="action-button" (click)="stop()">Stop</ion-button>
       <ion-button expand="block" color="success" class="action-button" (click)="flip()">Flip</ion-button>
-      <ion-button expand="block" color="warning" class="action-button" (click)="captureSample()">Capture
-        Sample</ion-button>
+      <ion-button expand="block" color="warning" class="action-button" (click)="capture()">Capture</ion-button>
     </ion-card-content>
   </ion-card>
 
   <ng-container *ngIf="imageData">
     <!-- <div class="title">Original Image/Photo</div> -->
     <div class="image-container">
-      <img alt="Photo" class="sample-image" id="sampleImage" />
+      <img alt="Photo" class="sample-image" id="image" />
     </div>
   </ng-container>
 

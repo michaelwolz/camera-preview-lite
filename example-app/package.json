@@ -1,8 +1,7 @@
 {
   "name": "example-app",
   "version": "7.0.1",
-  "author": "Alex Ryltsov <ryltsov.alex@gmail.com>",
-  "homepage": "https://github.com/capacitor-community/camera-preview",
+  "homepage": "https://github.com/michaelwolz/camera-preview-lite",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -35,7 +34,7 @@
     "@angular/platform-browser": "^19.2.5",
     "@angular/platform-browser-dynamic": "^19.2.5",
     "@angular/router": "^19.2.5",
-    "@capacitor-community/camera-preview": "file:..",
+    "@michaelwolz/camera-preview-lite": "file:..",
     "@capacitor/android": "^7.2.0",
     "@capacitor/app": "^7.0.1",
     "@capacitor/core": "^7.0.1",

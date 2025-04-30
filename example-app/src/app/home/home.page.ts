@@ -5,7 +5,7 @@ import {
 } from '@ionic/angular/standalone';
 
 // NATIVE
-import { CameraPreview } from '@capacitor-community/camera-preview';
+import { CameraPreview } from '@michaelwolz/camera-preview-lite';
 
 @Component({
   selector: 'app-home',
@@ -27,7 +27,6 @@ export class HomePage {
       parent: 'content',
       toBack: true,
       position: 'front',
-      disableAudio: true
     });
   }
 
@@ -37,7 +36,6 @@ export class HomePage {
       parent: 'content',
       toBack: true,
       position: 'rear',
-      disableAudio: true
     });
   }
 
@@ -49,20 +47,19 @@ export class HomePage {
     await CameraPreview.flip();
   }
 
-  public async captureSample(): Promise<void> {
-    const cameraSampleOptions = {
+  public async capture(): Promise<void> {
+    const cameraOptions = {
       quality: 50
     };
 
-    const result = await CameraPreview.captureSample(cameraSampleOptions);
+    const result = await CameraPreview.capture(cameraOptions);
     // console.log(`data:image/jpeg;base64,${result.value}`);
     this.imageData = `data:image/jpeg;base64,${result.value}`;
 
     await new Promise(resolve => setTimeout(resolve, 250));
 
-    const sampleImageElement = document.getElementById('sampleImage') as HTMLImageElement;
-    // NOTE: Can be set to the src of an image now
-    sampleImageElement.src = this.imageData;
+    const ImageElement = document.getElementById('image') as HTMLImageElement;
+    ImageElement.src = this.imageData;
 
     await this.stop();
   }
