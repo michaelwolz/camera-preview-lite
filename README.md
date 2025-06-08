@@ -1,3 +1,7 @@
+# DEPRECATED
+
+This repository is no longer maintained. Please use [capacitor-camera-view](https://github.com/michaelwolz/capacitor-camera-view) instead, which leverages modern APIs and offers many new features.
+
 <h1 align="center">📷</h1>
 
 <h3 align="center">Capacitor Camera Preview Lite</h3>
